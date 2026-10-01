@@ -12,4 +12,5 @@ target/
 
 # AI 客服模块的本地 key 配置（三级注入第二级，永不入库） #
 **/application-local.yml
-**/application-local.yamlportal.log
+**/application-local.yaml
+portal.log
