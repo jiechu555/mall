@@ -52,13 +52,21 @@ class AiKbEvaluationTest {
                 System.getenv().getOrDefault("AI_ENABLED", "false")));
         int hit = 0, miss = 0;
         List<String> missDetails = new ArrayList<>();
+        List<Long> hybridLatencies = new ArrayList<>();
+        List<Long> bm25Latencies = new ArrayList<>();
 
         for (JsonNode q : questions) {
             String question = q.path("question").asText();
             String expectedType = q.path("expected_type").asText("");
             String expectedTitle = q.path("expected_title").asText("");
 
+            long t0 = System.nanoTime();
             List<AiKbHit> results = aiKbService.searchHybrid(question, 5);
+            hybridLatencies.add((System.nanoTime() - t0) / 1_000_000);
+            // BM25 单路对照：混合延迟 - BM25 延迟 ≈ 向量路开销（embedding API + kNN）
+            long t1 = System.nanoTime();
+            aiKbService.searchByKeyword(question, 5);
+            bm25Latencies.add((System.nanoTime() - t1) / 1_000_000);
 
             boolean found = false;
             for (AiKbHit r : results) {
@@ -82,6 +90,8 @@ class AiKbEvaluationTest {
         System.out.println("  总题数: " + questions.size());
         System.out.println("  命中: " + hit + "  未命中: " + miss);
         System.out.printf("  召回@5: %.1f%%%n", recall);
+        printLatency("混合检索 searchHybrid", hybridLatencies, hybrid);
+        printLatency("BM25 单路 searchByKeyword", bm25Latencies, hybrid);
         System.out.println("========================================");
         if (!missDetails.isEmpty()) {
             System.out.println("未命中明细：");
@@ -91,6 +101,17 @@ class AiKbEvaluationTest {
         // 混合模式门槛 92%（实测 100%）；纯 BM25 基线门槛 60%（实测 84%——白话 miss 由向量检索补齐）
         assertTrue(recall >= 92.0,
                 String.format("混合检索召回@5 应 ≥92%%（实际 %.1f%%）——检查 ai.enabled/api-key 是否生效、索引向量是否完整", recall));
+    }
+
+    /** 延迟统计：中位数 / P95 / 最大（毫秒）。混合模式的延迟受 embedding API 网络往返支配，BM25 单路是纯本机 ES。 */
+    private void printLatency(String label, List<Long> latencies, boolean hybrid) {
+        List<Long> sorted = new ArrayList<>(latencies);
+        java.util.Collections.sort(sorted);
+        long median = sorted.get(sorted.size() / 2);
+        long p95 = sorted.get((int) Math.ceil(sorted.size() * 0.95) - 1);
+        long max = sorted.get(sorted.size() - 1);
+        String note = hybrid && label.startsWith("混合") ? "（含 embedding API 网络往返）" : "";
+        System.out.printf("  延迟[%s] 中位=%dms P95=%dms 最大=%dms%s%n", label, median, p95, max, note);
     }
 
     private boolean match(AiKbHit hit, String expectedType, String expectedTitle) {
