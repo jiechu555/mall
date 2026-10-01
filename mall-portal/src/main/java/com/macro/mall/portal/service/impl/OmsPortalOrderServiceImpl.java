@@ -261,6 +261,11 @@ public class OmsPortalOrderServiceImpl implements OmsPortalOrderService {
         //恢复所有下单商品的锁定库存，扣减真实库存
         OmsOrderDetail orderDetail = portalOrderDao.getDetail(orderId);
         int count = portalOrderDao.updateSkuStock(orderDetail.getOrderItemList());
+        //库存守卫：任一 SKU 的 stock 小于购买数量时该行不会被更新，影响行数小于明细数即支付失败——
+        //抛出异常令整个支付事务回滚（含订单状态修改），防止 stock 扣成负数（超卖）
+        if (orderDetail.getOrderItemList() != null && count < orderDetail.getOrderItemList().size()) {
+            Asserts.fail("库存不足，支付失败");
+        }
         return count;
     }
 

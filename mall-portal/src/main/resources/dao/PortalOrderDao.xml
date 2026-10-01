@@ -48,6 +48,9 @@
     </select>
 
     <update id="updateSkuStock">
+        <!-- 库存守卫：stock 不足的行不参与更新（配合调用方对影响行数的校验+事务回滚，防止扣成负数超卖）。
+             只守卫 stock 不守卫 lock_stock：历史数据 lock_stock 存在负值遗留，守卫它会阻断这些 SKU 的正常支付；
+             lock_stock 属内部记账，允许非负偏差。 -->
         UPDATE pms_sku_stock
         SET
             stock = CASE id
@@ -65,6 +68,11 @@
         <foreach collection="itemList" item="item" separator="," open="(" close=")">
             #{item.productSkuId}
         </foreach>
+        AND stock >= CASE id
+        <foreach collection="itemList" item="item">
+            WHEN #{item.productSkuId} THEN #{item.productQuantity}
+        </foreach>
+        END
     </update>
     <update id="updateOrderStatus">
         update oms_order
