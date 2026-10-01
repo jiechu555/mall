@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, feature/seckill ]
+  pull_request:
+
+jobs:
+  test:
+    name: mall-portal 集成测试（含秒杀模块）
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      mysql:
+        image: mysql:5.7
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: mall
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      rabbitmq:
+        image: rabbitmq:3.9.11-management
+        env:
+          RABBITMQ_DEFAULT_USER: mall
+          RABBITMQ_DEFAULT_PASS: mall
+          RABBITMQ_DEFAULT_VHOST: /mall
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd="rabbitmq-diagnostics -q ping"
+          --health-interval=15s
+          --health-timeout=10s
+          --health-retries=10
+      mongo:
+        image: mongo:4
+        ports:
+          - 27017:27017
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: 安装 MySQL 客户端并等待数据库就绪
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq mysql-client
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -uroot -proot --silent; then break; fi
+            sleep 2
+          done
+          mysqladmin ping -h 127.0.0.1 -uroot -proot
+
+      - name: 导入数据库（mall 全量 + 秒杀表 + 测试种子）
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot --default-character-set=utf8mb4 mall < document/sql/mall.sql
+          mysql -h 127.0.0.1 -uroot -proot --default-character-set=utf8mb4 mall < document/sql/seckill.sql
+          mysql -h 127.0.0.1 -uroot -proot --default-character-set=utf8mb4 mall < mall-portal/src/test/resources/ci-seed.sql
+          mysql -h 127.0.0.1 -uroot -proot -e "USE mall; SELECT COUNT(*) AS tables_cnt FROM information_schema.tables WHERE table_schema='mall'; SELECT id,username FROM ums_member WHERE id=12;"
+
+      - name: 运行 mall-portal 集成测试（父 pom 默认 skipTests=true，须显式开启）
+        run: mvn -B -pl mall-portal -am -DskipTests=false -Ddocker.skip=true test
+
+      - name: 上传测试报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: mall-portal/target/surefire-reports/
+          retention-days: 7
