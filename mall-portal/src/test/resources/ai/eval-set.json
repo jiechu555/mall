@@ -1,0 +1,30 @@
+{
+  "description": "AI 客服检索质量评测集：25 问，覆盖商品型号词/FAQ 政策问法/白话口语三类。标注字段 expected_type/expected_title 含于 top5 即算命中。",
+  "questions": [
+    {"id": 1,  "category": "商品-型号词", "question": "小米8", "expected_type": "PRODUCT", "expected_title": "小米8"},
+    {"id": 2,  "category": "商品-型号词", "question": "华为P20", "expected_type": "PRODUCT", "expected_title": "华为"},
+    {"id": 3,  "category": "商品-型号词", "question": "红米5A", "expected_type": "PRODUCT", "expected_title": "红米"},
+    {"id": 4,  "category": "商品-特征", "question": "全面屏手机", "expected_type": "PRODUCT", "expected_title": "小米8"},
+    {"id": 5,  "category": "商品-特征", "question": "双卡双待", "expected_type": "PRODUCT", "expected_title": null},
+    {"id": 6,  "category": "商品-品牌", "question": "小米有什么手机", "expected_type": "PRODUCT", "expected_title": "小米"},
+    {"id": 7,  "category": "商品-品牌", "question": "华为手机", "expected_type": "PRODUCT", "expected_title": "华为"},
+    {"id": 8,  "category": "商品-参数", "question": "6GB内存", "expected_type": "PRODUCT", "expected_title": null},
+    {"id": 9,  "category": "商品-参数", "question": "黑色手机", "expected_type": "PRODUCT", "expected_title": null},
+    {"id": 10, "category": "商品-宽泛", "question": "智能手机推荐", "expected_type": "PRODUCT", "expected_title": null},
+    {"id": 11, "category": "FAQ-政策", "question": "退货", "expected_type": "FAQ", "expected_title": "退换货政策"},
+    {"id": 12, "category": "FAQ-政策", "question": "怎么退货", "expected_type": "FAQ", "expected_title": "退换货"},
+    {"id": 13, "category": "FAQ-政策", "question": "运费多少钱", "expected_type": "FAQ", "expected_title": "运费"},
+    {"id": 14, "category": "FAQ-政策", "question": "多久发货", "expected_type": "FAQ", "expected_title": "发货"},
+    {"id": 15, "category": "FAQ-政策", "question": "发票怎么开", "expected_type": "FAQ", "expected_title": "发票"},
+    {"id": 16, "category": "FAQ-政策", "question": "修改收货地址", "expected_type": "FAQ", "expected_title": "收货地址"},
+    {"id": 17, "category": "FAQ-政策", "question": "优惠券怎么用", "expected_type": "FAQ", "expected_title": "优惠券"},
+    {"id": 18, "category": "FAQ-秒杀", "question": "秒杀怎么参与", "expected_type": "FAQ", "expected_title": "秒杀怎么参与"},
+    {"id": 19, "category": "FAQ-秒杀", "question": "秒杀显示受理中", "expected_type": "FAQ", "expected_title": "受理中"},
+    {"id": 20, "category": "FAQ-秒杀", "question": "秒杀超时不付款", "expected_type": "FAQ", "expected_title": "超时"},
+    {"id": 21, "category": "FAQ-白话", "question": "买了能退吗", "expected_type": "FAQ", "expected_title": "退换货"},
+    {"id": 22, "category": "FAQ-白话", "question": "东西什么时候到", "expected_type": "FAQ", "expected_title": "发货"},
+    {"id": 23, "category": "FAQ-白话", "question": "不想要了怎么办", "expected_type": "FAQ", "expected_title": "退换货"},
+    {"id": 24, "category": "FAQ-白话", "question": "支付方式有哪些", "expected_type": "FAQ", "expected_title": "支付"},
+    {"id": 25, "category": "FAQ-白话", "question": "积分有什么用", "expected_type": "FAQ", "expected_title": "积分"}
+  ]
+}
