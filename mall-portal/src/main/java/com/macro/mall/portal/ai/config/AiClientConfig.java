@@ -1,8 +1,12 @@
 package com.macro.mall.portal.ai.config;
 
+import com.macro.mall.portal.ai.client.AiChatClient;
 import com.macro.mall.portal.ai.client.AiEmbeddingClient;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.document.MetadataMode;
 import org.springframework.ai.embedding.EmbeddingModel;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.ai.openai.OpenAiEmbeddingModel;
 import org.springframework.ai.openai.OpenAiEmbeddingOptions;
 import org.springframework.ai.openai.api.OpenAiApi;
@@ -44,5 +48,21 @@ public class AiClientConfig {
                 .build();
         EmbeddingModel embeddingModel = new OpenAiEmbeddingModel(openAiApi, MetadataMode.EMBED, options);
         return new AiEmbeddingClient(embeddingModel);
+    }
+
+    @Bean
+    @ConditionalOnProperty(name = "ai.enabled", havingValue = "true")
+    public AiChatClient aiChatClient(OpenAiApi openAiApi,
+                                     @Value("${ai.chat-model}") String model) {
+        // 客服场景要稳定不要发散：温度 0.2（设计文档 08 讲第六节成本护栏）
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+                .model(model)
+                .temperature(0.2)
+                .build();
+        ChatModel chatModel = OpenAiChatModel.builder()
+                .openAiApi(openAiApi)
+                .defaultOptions(options)
+                .build();
+        return new AiChatClient(chatModel);
     }
 }
