@@ -90,11 +90,15 @@ jobs:
             -e "ES_JAVA_OPTS=-Xms256m -Xmx512m" \
             -v "$PWD/ikvol/analysis-ik:/usr/share/elasticsearch/plugins/analysis-ik" \
             elasticsearch:7.17.3
-          for i in $(seq 1 45); do
+          for i in $(seq 1 120); do
             if curl -sf http://localhost:9200 >/dev/null; then break; fi
-            sleep 2
+            sleep 3
           done
-          curl -sf http://localhost:9200 | head -2
+          if ! curl -sf http://localhost:9200 | head -2; then
+            echo "== ES 未在 6 分钟内就绪，容器日志尾部 =="
+            docker logs --tail 40 es || true
+            exit 1
+          fi
           curl -sf -X GET "http://localhost:9200/_cat/plugins?v"
 
       - name: 运行 mall-portal 集成测试（父 pom 默认 skipTests=true，须显式开启）
