@@ -25,4 +25,9 @@ public interface FlashSaleStockService {
      * @return 剩余数量；活动未预热时返回 -1
      */
     Long getRemainingStock(Long promotionId, Long sessionId, Long productId);
+
+    /**
+     * 回补库存（原子 INCRBY）：对账任务回补少卖、清扫失败受理单退回时使用
+     */
+    void refundStock(Long promotionId, Long sessionId, Long productId, Integer delta);
 }

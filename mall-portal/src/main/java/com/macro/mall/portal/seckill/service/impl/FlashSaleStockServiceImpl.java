@@ -87,6 +87,11 @@ public class FlashSaleStockServiceImpl implements FlashSaleStockService {
         return value == null ? -1L : ((Number) value).longValue();
     }
 
+    @Override
+    public void refundStock(Long promotionId, Long sessionId, Long productId, Integer delta) {
+        redisTemplate.opsForValue().increment(stockKey(promotionId, sessionId, productId), delta);
+    }
+
     private String stockKey(Long promotionId, Long sessionId, Long productId) {
         return redisDatabase + ":" + stockKeyPrefix + ":" + promotionId + ":" + sessionId + ":" + productId;
     }

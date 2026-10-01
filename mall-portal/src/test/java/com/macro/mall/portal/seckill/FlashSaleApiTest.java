@@ -40,7 +40,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class FlashSaleApiTest {
 
-    private static final Long PROMOTION = 9910L;
     private static final Long SESSION = 1L;
     private static final Long PRODUCT = 27L;
 
@@ -63,20 +62,22 @@ class FlashSaleApiTest {
     @Autowired
     private AmqpAdmin amqpAdmin;
 
+    /** mbg 的 generatedKey 会忽略预设自增 id，统一用 insert 后回填的生成 id */
+    private Long promotionId;
     private String jwt;
 
     @BeforeEach
     void setUp() {
         // 合成一场"正在进行"的秒杀：活动日期覆盖今天 + 关系表商品 27（价 1999、量 100、限购 2）
         SmsFlashPromotion promotion = new SmsFlashPromotion();
-        promotion.setId(PROMOTION);
-        promotion.setTitle("commit5验收活动");
+        promotion.setTitle("commit5-api-check");
         promotion.setStatus(1);
         promotion.setStartDate(new Date(System.currentTimeMillis() - 3600_000));
         promotion.setEndDate(new Date(System.currentTimeMillis() + 3600_000));
         promotionMapper.insert(promotion);
+        promotionId = promotion.getId();
         SmsFlashPromotionProductRelation relation = new SmsFlashPromotionProductRelation();
-        relation.setFlashPromotionId(PROMOTION);
+        relation.setFlashPromotionId(promotionId);
         relation.setFlashPromotionSessionId(SESSION);
         relation.setProductId(PRODUCT);
         relation.setFlashPromotionPrice(new BigDecimal("1999.00"));
@@ -84,8 +85,8 @@ class FlashSaleApiTest {
         relation.setFlashPromotionLimit(2);
         relationMapper.insert(relation);
 
-        flashSaleStockService.warmUp(PROMOTION, SESSION);
-        flashSaleService.issueTokens(PROMOTION, SESSION, 10);
+        flashSaleStockService.warmUp(promotionId, SESSION);
+        flashSaleService.issueTokens(promotionId, SESSION, 10);
 
         jwt = login();
     }
@@ -93,7 +94,7 @@ class FlashSaleApiTest {
     @AfterEach
     void cleanUp() {
         SmsFlashPromotionOrderExample example = new SmsFlashPromotionOrderExample();
-        example.createCriteria().andFlashPromotionIdEqualTo(PROMOTION);
+        example.createCriteria().andFlashPromotionIdEqualTo(promotionId);
         for (SmsFlashPromotionOrder row : acceptanceMapper.selectByExample(example)) {
             if (row.getOrderId() != null) {
                 OmsOrderItemExample itemExample = new OmsOrderItemExample();
@@ -103,8 +104,10 @@ class FlashSaleApiTest {
             }
             acceptanceMapper.deleteByPrimaryKey(row.getId());
         }
-        relationByExample().ifPresent(relations -> relationMapper.deleteByExample(exampleOfRelation()));
-        promotionMapper.deleteByPrimaryKey(PROMOTION);
+        SmsFlashPromotionProductRelationExample relationExample = new SmsFlashPromotionProductRelationExample();
+        relationExample.createCriteria().andFlashPromotionIdEqualTo(promotionId);
+        relationMapper.deleteByExample(relationExample);
+        promotionMapper.deleteByPrimaryKey(promotionId);
         amqpAdmin.purgeQueue("mall.order.cancel.ttl", false);
         amqpAdmin.purgeQueue("mall.flashsale.order", false);
     }
@@ -136,7 +139,7 @@ class FlashSaleApiTest {
     void 全链路_下单受理并轮询到成功() throws Exception {
         // 频控测试可能刚打满 1 秒窗口，先等窗口过期再下单
         Thread.sleep(1200);
-        List<String> tokens = flashSaleService.issueTokens(PROMOTION, SESSION, 1);
+        List<String> tokens = flashSaleService.issueTokens(promotionId, SESSION, 1);
         String body = postOrder(tokens.get(0));
         assertTrue(body.contains("\"code\":200"), "有效令牌下单应受理成功，实际: " + body);
         String ticket = extractTicket(body);
@@ -165,7 +168,7 @@ class FlashSaleApiTest {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + jwt);
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        String url = "/seckill/order?promotionId=" + PROMOTION + "&sessionId=" + SESSION
+        String url = "/seckill/order?promotionId=" + promotionId + "&sessionId=" + SESSION
                 + "&productId=" + PRODUCT + "&memberReceiveAddressId=7&token=" + token;
         return rest.exchange(url, HttpMethod.POST, new HttpEntity<>(headers), String.class).getBody();
     }
@@ -183,15 +186,5 @@ class FlashSaleApiTest {
             return null;
         }
         return body.substring(start, body.indexOf("\"", start));
-    }
-
-    private java.util.Optional<List<SmsFlashPromotionProductRelation>> relationByExample() {
-        return java.util.Optional.of(relationMapper.selectByExample(exampleOfRelation()));
-    }
-
-    private SmsFlashPromotionProductRelationExample exampleOfRelation() {
-        SmsFlashPromotionProductRelationExample example = new SmsFlashPromotionProductRelationExample();
-        example.createCriteria().andFlashPromotionIdEqualTo(PROMOTION);
-        return example;
     }
 }
