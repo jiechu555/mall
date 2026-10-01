@@ -2,6 +2,7 @@ package com.macro.mall.portal.config;
 
 import com.macro.mall.portal.domain.QueueEnum;
 import org.springframework.amqp.core.*;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -74,6 +75,39 @@ public class RabbitMqConfig {
                 .bind(orderTtlQueue)
                 .to(orderTtlDirect)
                 .with(QueueEnum.QUEUE_TTL_ORDER_CANCEL.getRouteKey());
+    }
+
+    /**
+     * 秒杀订单实际消费队列所绑定的交换机
+     */
+    @Bean
+    @ConditionalOnProperty(name = "seckill.enabled", havingValue = "true", matchIfMissing = true)
+    DirectExchange flashSaleDirect() {
+        return ExchangeBuilder
+                .directExchange(QueueEnum.QUEUE_FLASH_SALE_ORDER.getExchange())
+                .durable(true)
+                .build();
+    }
+
+    /**
+     * 秒杀订单实际消费队列
+     */
+    @Bean
+    @ConditionalOnProperty(name = "seckill.enabled", havingValue = "true", matchIfMissing = true)
+    public Queue flashSaleQueue() {
+        return new Queue(QueueEnum.QUEUE_FLASH_SALE_ORDER.getName());
+    }
+
+    /**
+     * 将秒杀订单队列绑定到交换机
+     */
+    @Bean
+    @ConditionalOnProperty(name = "seckill.enabled", havingValue = "true", matchIfMissing = true)
+    Binding flashSaleBinding(DirectExchange flashSaleDirect, Queue flashSaleQueue) {
+        return BindingBuilder
+                .bind(flashSaleQueue)
+                .to(flashSaleDirect)
+                .with(QueueEnum.QUEUE_FLASH_SALE_ORDER.getRouteKey());
     }
 
 }
