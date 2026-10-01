@@ -80,8 +80,9 @@ jobs:
 
       - name: 启动 Elasticsearch 7.17 + ik 分词（AI 知识库用）
         run: |
-          docker run -d --name es -p 9200:9200 -e "discovery.type=single-node" -e "ES_JAVA_OPTS=-Xms512m -Xmx1024m" elasticsearch:7.17.3
-          docker exec es elasticsearch-plugin install --batch https://release.infinilabs.com/analysis-ik/stable/elasticsearch-analysis-ik-7.17.3.zip
+          # KB 仅数十篇文档，256m 堆足够；runner 上还有四个 service 容器，堆大了会被 OOM(137)
+          docker run -d --name es -p 9200:9200 -e "discovery.type=single-node" -e "ES_JAVA_OPTS=-Xms256m -Xmx512m" elasticsearch:7.17.3
+          docker exec -e ES_JAVA_OPTS="-Xms128m -Xmx256m" es elasticsearch-plugin install --batch https://release.infinilabs.com/analysis-ik/stable/elasticsearch-analysis-ik-7.17.3.zip
           docker restart es
           for i in $(seq 1 45); do
             if curl -sf http://localhost:9200 >/dev/null; then break; fi
