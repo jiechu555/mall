@@ -80,15 +80,22 @@ jobs:
 
       - name: 启动 Elasticsearch 7.17 + ik 分词（AI 知识库用）
         run: |
-          # KB 仅数十篇文档，256m 堆足够；runner 上还有四个 service 容器，堆大了会被 OOM(137)
-          docker run -d --name es -p 9200:9200 -e "discovery.type=single-node" -e "ES_JAVA_OPTS=-Xms256m -Xmx512m" elasticsearch:7.17.3
-          docker exec -e ES_JAVA_OPTS="-Xms128m -Xmx256m" es elasticsearch-plugin install --batch https://release.infinilabs.com/analysis-ik/stable/elasticsearch-analysis-ik-7.17.3.zip
-          docker restart es
+          # 插件不进容器安装（plugin CLI 的第二个 JVM 会与 ES 同 cgroup 触发 OOM 137）：
+          # runner 上解压后以 volume 挂进 plugins 目录，效果等同 elasticsearch-plugin install
+          # KB 仅数十篇文档，256m 堆足够；runner 上还有四个 service 容器
+          curl -sL -o /tmp/ik.zip https://release.infinilabs.com/analysis-ik/stable/elasticsearch-analysis-ik-7.17.3.zip
+          mkdir -p ikvol/analysis-ik && unzip -oq /tmp/ik.zip -d ikvol/analysis-ik
+          ls ikvol/analysis-ik | head -4
+          docker run -d --name es -p 9200:9200 -e "discovery.type=single-node" \
+            -e "ES_JAVA_OPTS=-Xms256m -Xmx512m" \
+            -v "$PWD/ikvol/analysis-ik:/usr/share/elasticsearch/plugins/analysis-ik" \
+            elasticsearch:7.17.3
           for i in $(seq 1 45); do
             if curl -sf http://localhost:9200 >/dev/null; then break; fi
             sleep 2
           done
           curl -sf http://localhost:9200 | head -2
+          curl -sf -X GET "http://localhost:9200/_cat/plugins?v"
 
       - name: 运行 mall-portal 集成测试（父 pom 默认 skipTests=true，须显式开启）
         run: mvn -B -pl mall-portal -am -DskipTests=false -Ddocker.skip=true test
