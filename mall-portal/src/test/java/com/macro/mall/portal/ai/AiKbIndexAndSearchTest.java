@@ -59,4 +59,13 @@ class AiKbIndexAndSearchTest {
                 "秒杀受理中 应命中 FAQ，实际 " + hits);
         assertEquals(3, hits.size(), "topK 应生效");
     }
+
+    @Test
+    void 混合检索_嵌入不可用时降级为纯BM25() {
+        List<AiKbHit> hybrid = aiKbService.searchHybrid("小米", 5);
+        List<AiKbHit> bm25 = aiKbService.searchByKeyword("小米", 5);
+        assertTrue(hybrid.size() > 0, "降级后仍应有 BM25 结果");
+        assertEquals(bm25.get(0).getSourceId(), hybrid.get(0).getSourceId(),
+                "降级时第一名应与纯 BM25 一致");
+    }
 }
