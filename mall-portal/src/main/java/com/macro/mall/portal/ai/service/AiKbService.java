@@ -28,4 +28,12 @@ public interface AiKbService {
      * @return 按相关度排序的命中列表
      */
     List<AiKbHit> searchByKeyword(String keyword, int topK);
+
+    /**
+     * 混合检索（commit 4）：BM25 + kNN 向量余弦相似 双路 → RRF（k=60）融合排序。
+     * 嵌入不可用（ai.enabled=false）或嵌入失败时自动降级为纯 BM25。
+     *
+     * @return 融合排序后的 topK 命中
+     */
+    List<AiKbHit> searchHybrid(String keyword, int topK);
 }

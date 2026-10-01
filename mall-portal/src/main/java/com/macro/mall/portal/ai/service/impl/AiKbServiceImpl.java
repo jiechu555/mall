@@ -49,6 +49,8 @@ public class AiKbServiceImpl implements AiKbService {
     private static final Logger LOGGER = LoggerFactory.getLogger(AiKbServiceImpl.class);
 
     public static final String INDEX = "ai_kb";
+    /** 混合检索每路取多少条参与 RRF 融合（最终截取 topK） */
+    private static final int HYBRID_POOL_SIZE = 10;
 
     private static final String MAPPING_JSON = "{"
             + "\"settings\":{\"number_of_shards\":1,\"number_of_replicas\":0},"
@@ -111,6 +113,112 @@ public class AiKbServiceImpl implements AiKbService {
             throw new RuntimeException("AI 知识库重建失败", e);
         }
     }
+
+    // ==================== 混合检索（commit 4）====================
+
+    @Override
+    public List<AiKbHit> searchHybrid(String keyword, int topK) {
+        // 双路各取 10 条用于融合（topK 最终截取）
+        List<AiKbHit> bm25Hits = searchByKeyword(keyword, HYBRID_POOL_SIZE);
+
+        // 嵌入不可用或失败 → 纯 BM25 降级
+        if (embeddingClient == null) {
+            return bm25Hits.size() > topK ? new ArrayList<>(bm25Hits.subList(0, topK)) : bm25Hits;
+        }
+        List<AiKbHit> vectorHits;
+        try {
+            vectorHits = searchByVector(embeddingClient.embed(keyword), HYBRID_POOL_SIZE);
+        } catch (Exception e) {
+            LOGGER.warn("向量检索失败，降级为纯 BM25: {}", keyword, e);
+            return bm25Hits.size() > topK ? new ArrayList<>(bm25Hits.subList(0, topK)) : bm25Hits;
+        }
+
+        List<AiKbHit> fused = rrfFuse(bm25Hits, vectorHits);
+        return fused.size() > topK ? new ArrayList<>(fused.subList(0, topK)) : fused;
+    }
+
+    /**
+     * kNN 向量检索：ES 7.17 的精确 kNN——script_score + cosineSimilarity。
+     * exists 过滤只对有 content_vector 的文档计分（部分文档嵌入失败时缺向量，跳过不报错）。
+     */
+    List<AiKbHit> searchByVector(float[] queryVector, int topK) {
+        try {
+            ObjectNode scriptParams = objectMapper.createObjectNode();
+            ArrayNode vectorArray = scriptParams.putArray("query_vector");
+            for (float v : queryVector) {
+                vectorArray.add(v);
+            }
+
+            ObjectNode body = objectMapper.createObjectNode();
+            ObjectNode scriptScore = body.putObject("query").putObject("script_score");
+            // 只对有向量的文档计分——ES 7 的 cosineSimilarity 遇 null 向量会报错，必须前置过滤
+            scriptScore.putObject("query").putObject("bool")
+                    .putObject("must").putObject("exists").put("field", "content_vector");
+            ObjectNode script = scriptScore.putObject("script");
+            script.put("source", "cosineSimilarity(params.query_vector, 'content_vector') + 1.0");
+            script.set("params", scriptParams);
+            body.put("size", topK);
+            body.putArray("_source").add("source_type").add("source_id").add("title").add("content");
+
+            Request request = new Request("POST", "/" + INDEX + "/_search");
+            request.setJsonEntity(objectMapper.writeValueAsString(body));
+            Response response = restClient.performRequest(request);
+            JsonNode hits = objectMapper.readTree(EntityUtils.toString(response.getEntity(), StandardCharsets.UTF_8))
+                    .path("hits").path("hits");
+
+            List<AiKbHit> result = new ArrayList<>();
+            for (JsonNode hit : hits) {
+                JsonNode src = hit.path("_source");
+                AiKbHit item = new AiKbHit();
+                item.setSourceType(src.path("source_type").asText());
+                item.setSourceId(src.path("source_id").asLong());
+                item.setTitle(src.path("title").asText());
+                item.setScore(hit.path("_score").asDouble());
+                String content = src.path("content").asText("");
+                item.setSnippet(content.length() > 120 ? content.substring(0, 120) + "..." : content);
+                result.add(item);
+            }
+            return result;
+        } catch (Exception e) {
+            LOGGER.error("kNN 向量检索失败", e);
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * RRF（Reciprocal Rank Fusion，Cormack et al. 2009）：k=60。
+     * 每路贡献 1/(k+rank)，跨路求和；两路都命中的文档分数更高（共识信号）。
+     */
+    public static List<AiKbHit> rrfFuse(List<AiKbHit> bm25Hits, List<AiKbHit> vectorHits) {
+        java.util.LinkedHashMap<String, AiKbHit> fused = new java.util.LinkedHashMap<>();
+        java.util.Map<String, Double> scores = new java.util.HashMap<>();
+        final double k = 60.0;
+
+        accumulateRRF(bm25Hits, fused, scores, k);
+        accumulateRRF(vectorHits, fused, scores, k);
+
+        List<AiKbHit> result = new ArrayList<>(fused.values());
+        result.sort((a, b) -> Double.compare(scores.get(keyOf(b)), scores.get(keyOf(a))));
+        for (AiKbHit hit : result) {
+            hit.setScore(scores.get(keyOf(hit)));
+        }
+        return result;
+    }
+
+    private static void accumulateRRF(List<AiKbHit> hits, java.util.LinkedHashMap<String, AiKbHit> fused,
+                                       java.util.Map<String, Double> scores, double k) {
+        for (int i = 0; i < hits.size(); i++) {
+            String key = keyOf(hits.get(i));
+            fused.putIfAbsent(key, hits.get(i));
+            scores.merge(key, 1.0 / (k + i + 1), Double::sum);
+        }
+    }
+
+    private static String keyOf(AiKbHit hit) {
+        return hit.getSourceType() + ":" + hit.getSourceId();
+    }
+
+    // ==================== 以下为 commit 1 的原有方法 ====================
 
     @Override
     public long docCount() {
