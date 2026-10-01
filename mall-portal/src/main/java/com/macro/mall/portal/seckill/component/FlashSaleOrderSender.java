@@ -2,6 +2,8 @@ package com.macro.mall.portal.seckill.component;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.macro.mall.mapper.OmsOrderSettingMapper;
+import com.macro.mall.model.OmsOrderSetting;
 import com.macro.mall.portal.domain.QueueEnum;
 import com.macro.mall.portal.seckill.domain.FlashSaleOrderMessage;
 import org.slf4j.Logger;
@@ -27,10 +29,12 @@ public class FlashSaleOrderSender {
     private static final Logger LOGGER = LoggerFactory.getLogger(FlashSaleOrderSender.class);
 
     private final AmqpTemplate amqpTemplate;
+    private final OmsOrderSettingMapper orderSettingMapper;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public FlashSaleOrderSender(AmqpTemplate amqpTemplate) {
+    public FlashSaleOrderSender(AmqpTemplate amqpTemplate, OmsOrderSettingMapper orderSettingMapper) {
         this.amqpTemplate = amqpTemplate;
+        this.orderSettingMapper = orderSettingMapper;
     }
 
     public void sendMessage(FlashSaleOrderMessage message) {
@@ -52,5 +56,31 @@ public class FlashSaleOrderSender {
         } catch (JsonProcessingException e) {
             LOGGER.error("秒杀订单消息序列化失败: {}", message, e);
         }
+    }
+
+    /**
+     * 为秒杀订单安排超时自动取消：复用 mall 现有 TTL/死信队列（mall.order.cancel.ttl），
+     * 但取消时长读 mall 预留而未启用的 flash_order_overtime（分钟，种子值 60），
+     * 而不是普通订单的 normal_order_overtime（120 分钟）
+     */
+    public void sendCancelMessage(Long orderId) {
+        long minutes = 60;
+        OmsOrderSetting setting = orderSettingMapper == null ? null : orderSettingMapper.selectByPrimaryKey(1L);
+        if (setting != null && setting.getFlashOrderOvertime() != null) {
+            minutes = setting.getFlashOrderOvertime();
+        }
+        final long delayMillis = minutes * 60 * 1000;
+        amqpTemplate.convertAndSend(
+                QueueEnum.QUEUE_TTL_ORDER_CANCEL.getExchange(),
+                QueueEnum.QUEUE_TTL_ORDER_CANCEL.getRouteKey(),
+                orderId,
+                new MessagePostProcessor() {
+                    @Override
+                    public Message postProcessMessage(Message m) throws AmqpException {
+                        m.getMessageProperties().setExpiration(String.valueOf(delayMillis));
+                        return m;
+                    }
+                });
+        LOGGER.info("send flashSaleCancel orderId:{} delay:{}ms", orderId, delayMillis);
     }
 }

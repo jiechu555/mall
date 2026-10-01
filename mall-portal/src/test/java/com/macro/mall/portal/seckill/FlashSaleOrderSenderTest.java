@@ -21,10 +21,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * 秒杀消息发送链路测试：直连本机 RabbitMQ（vhost /mall，与 dev 环境同实例）。
- * 测试自建与生产配置同名的交换机/队列/绑定（幂等，应用启动时会再次声明），
- * 发送一条消息后消费回来，验证 JSON 内容完整往返。
+ * 环境里可能存在活跃消费者（常驻应用或 @SpringBootTest 缓存上下文）与本测试抢消息，
+ * 所以不直接消费业务队列，而是声明一个绑定到同一路由键的测试专属队列——
+ * 直连交换机会把消息复制给所有匹配绑定，业务消费者随便抢，测试照样收到副本。
  */
 class FlashSaleOrderSenderTest {
+
+    private static final String TEST_QUEUE = "mall.flashsale.order.sendertest";
 
     private static CachingConnectionFactory factory;
     private static RabbitTemplate rabbitTemplate;
@@ -37,18 +40,16 @@ class FlashSaleOrderSenderTest {
         factory.setVirtualHost("/mall");
         rabbitTemplate = new RabbitTemplate(factory);
 
-        // 与 RabbitMqConfig 中同名的声明（应用启动时 RabbitAdmin 会幂等地再声明一次）
         RabbitAdmin admin = new RabbitAdmin(rabbitTemplate);
-        DirectExchange exchange = new DirectExchange(QueueEnum.QUEUE_FLASH_SALE_ORDER.getExchange(), true, false);
-        Queue queue = new Queue(QueueEnum.QUEUE_FLASH_SALE_ORDER.getName());
-        Binding binding = BindingBuilder.bind(queue).to(exchange).with(QueueEnum.QUEUE_FLASH_SALE_ORDER.getRouteKey());
-        admin.declareExchange(exchange);
-        admin.declareQueue(queue);
-        admin.declareBinding(binding);
+        admin.declareQueue(new Queue(TEST_QUEUE));
+        admin.declareBinding(BindingBuilder.bind(new Queue(TEST_QUEUE))
+                .to(new DirectExchange(QueueEnum.QUEUE_FLASH_SALE_ORDER.getExchange()))
+                .with(QueueEnum.QUEUE_FLASH_SALE_ORDER.getRouteKey()));
     }
 
     @AfterAll
     static void cleanUp() {
+        new RabbitAdmin(rabbitTemplate).deleteQueue(TEST_QUEUE);
         factory.stop();
     }
 
@@ -66,11 +67,11 @@ class FlashSaleOrderSenderTest {
         message.setPayType(0);
         message.setTicket("ticket-test-0001");
 
-        FlashSaleOrderSender sender = new FlashSaleOrderSender(rabbitTemplate);
+        FlashSaleOrderSender sender = new FlashSaleOrderSender(rabbitTemplate, null);
         sender.sendMessage(message);
 
-        Object received = rabbitTemplate.receiveAndConvert(QueueEnum.QUEUE_FLASH_SALE_ORDER.getName(), 5000);
-        assertNotNull(received, "消息应在 5 秒内可被消费到");
+        Object received = rabbitTemplate.receiveAndConvert(TEST_QUEUE, 5000);
+        assertNotNull(received, "测试专属队列应在 5 秒内收到消息副本");
         String body = received.toString();
         assertTrue(body.contains("\"ticket\":\"ticket-test-0001\""), "受理号应完整往返，实际: " + body);
         assertTrue(body.contains("\"memberId\":42"), "会员id应完整往返，实际: " + body);
