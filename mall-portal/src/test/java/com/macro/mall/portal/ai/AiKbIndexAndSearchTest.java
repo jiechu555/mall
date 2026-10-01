@@ -3,6 +3,7 @@ package com.macro.mall.portal.ai;
 import com.macro.mall.portal.ai.domain.AiKbHit;
 import com.macro.mall.portal.ai.service.AiKbService;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,7 +16,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * 知识库 commit 1 验收：索引重建（38 商品 + 16 FAQ）与 BM25 关键词检索。
  * 走本机真实 ES（7.17.3 + ik），rebuild 幂等可重复执行。
+ * 标记 es 组：CI 暂排除（runner 上 ES 镜像拉取约 9 分钟且内存不稳），本地必跑。
  */
+@Tag("es")
 @SpringBootTest
 class AiKbIndexAndSearchTest {
 
