@@ -46,6 +46,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
         </dependency>
+        <!--AI 客服模块：Spring AI 核心客户端（OpenAI 兼容端点，指向智谱 v4）-->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai</artifactId>
+        </dependency>
         <!--支付宝支付Java SDK-->
         <dependency>
             <groupId>com.alipay.sdk</groupId>

@@ -73,6 +73,21 @@ redis:
 seckill:
   enabled: true
 
+# AI 客服模块（RAG）
+# 开关语义（设计文档 08 讲第五节定案）：ai.enabled 仅条件装配外部 API Bean（OpenAiApi/AiEmbeddingClient），
+# Controller 与 BM25 检索常驻——关闭时 /ai/chat 走纯 BM25 降级（degraded:true）。
+# key 三级注入（优先级从高到低）：环境变量 AI_API_KEY > application-local.yml（不入库） > 此处空串
+ai:
+  enabled: false
+  base-url: https://open.bigmodel.cn/api/paas/v4   # 智谱 OpenAI 兼容端点
+  api-key: ''
+  completions-path: /chat/completions              # 智谱 v4 不带 /v1 前缀（实测确认）
+  embeddings-path: /embeddings
+  chat-model: glm-4-flash
+  chat-timeout-ms: 10000
+  embedding-model: embedding-2
+  embedding-dims: 1024                             # 必须与 ES ai_kb mapping 的 dense_vector dims 一致
+
 mongo:
   insert:
     sqlEnable: true # 用于控制是否通过数据库数据来插入mongo

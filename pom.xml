@@ -55,6 +55,8 @@
         <mall-security.version>1.0-SNAPSHOT</mall-security.version>
         <commons-lang3.version>3.20.0</commons-lang3.version>
         <bouncycastle.version>1.84</bouncycastle.version>
+        <!-- Spring AI 版本在此锁定（RAG commit 2）；仅用核心依赖不用 starter，装配由 ai.enabled 精确控制 -->
+        <spring-ai.version>1.0.4</spring-ai.version>
     </properties>
 
     <dependencies>
@@ -89,6 +91,14 @@
 
     <dependencyManagement>
         <dependencies>
+            <!--Spring AI BOM（RAG 模块）-->
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <!--mall通用模块-->
             <dependency>
                 <groupId>com.macro.mall</groupId>
