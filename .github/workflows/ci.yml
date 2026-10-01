@@ -78,6 +78,17 @@ jobs:
           mysql -h 127.0.0.1 -uroot -proot --default-character-set=utf8mb4 mall < mall-portal/src/test/resources/ci-seed.sql
           mysql -h 127.0.0.1 -uroot -proot -e "USE mall; SELECT COUNT(*) AS tables_cnt FROM information_schema.tables WHERE table_schema='mall'; SELECT id,username FROM ums_member WHERE id=12;"
 
+      - name: 启动 Elasticsearch 7.17 + ik 分词（AI 知识库用）
+        run: |
+          docker run -d --name es -p 9200:9200 -e "discovery.type=single-node" -e "ES_JAVA_OPTS=-Xms512m -Xmx1024m" elasticsearch:7.17.3
+          docker exec es elasticsearch-plugin install --batch https://release.infinilabs.com/analysis-ik/stable/elasticsearch-analysis-ik-7.17.3.zip
+          docker restart es
+          for i in $(seq 1 45); do
+            if curl -sf http://localhost:9200 >/dev/null; then break; fi
+            sleep 2
+          done
+          curl -sf http://localhost:9200 | head -2
+
       - name: 运行 mall-portal 集成测试（父 pom 默认 skipTests=true，须显式开启）
         run: mvn -B -pl mall-portal -am -DskipTests=false -Ddocker.skip=true test
 

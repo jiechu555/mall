@@ -2,6 +2,8 @@ server:
   port: 8085
 
 spring:
+  elasticsearch:
+    uris: http://localhost:9200 # AI 客服知识库（ai_kb 索引）
   datasource:
     url: jdbc:mysql://localhost:3306/mall?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai&useSSL=false
     username: root

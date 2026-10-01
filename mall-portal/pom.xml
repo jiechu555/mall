@@ -41,6 +41,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp</artifactId>
         </dependency>
+        <!--AI 客服模块：Elasticsearch 知识库（BM25 检索 + dense_vector 向量检索）-->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-elasticsearch</artifactId>
+        </dependency>
         <!--支付宝支付Java SDK-->
         <dependency>
             <groupId>com.alipay.sdk</groupId>
