@@ -83,7 +83,7 @@ ai:
   api-key: ''
   completions-path: /chat/completions              # 智谱 v4 不带 /v1 前缀（实测确认）
   embeddings-path: /embeddings
-  chat-model: glm-4-flash
+  chat-model: glm-4.5-air
   chat-timeout-ms: 10000
   embedding-model: embedding-2
   embedding-dims: 1024                             # 必须与 ES ai_kb mapping 的 dense_vector dims 一致
