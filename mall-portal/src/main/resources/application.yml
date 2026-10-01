@@ -60,9 +60,16 @@ redis:
     authCode: 'ums:authCode'
     orderId: 'oms:orderId'
     member: 'ums:member'
+    flashSaleStock: 'sms:flashSaleStock'   # 完整key: mall:sms:flashSaleStock:{活动id}:{场次id}:{商品id}
+    flashSaleBought: 'sms:flashSaleBought' # 已购Hash: field=memberId, value=件数
+    flashSaleToken: 'sms:flashSaleToken'   # 秒杀令牌Set
   expire:
     authCode: 90 # 验证码超期时间
     common: 86400 # 24小时
+
+# 秒杀模块总开关（压测/灰度/回滚都用它）
+seckill:
+  enabled: true
 
 mongo:
   insert:
