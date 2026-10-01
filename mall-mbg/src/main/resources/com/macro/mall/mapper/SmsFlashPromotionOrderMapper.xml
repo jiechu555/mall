@@ -1,0 +1,338 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.macro.mall.mapper.SmsFlashPromotionOrderMapper">
+  <resultMap id="BaseResultMap" type="com.macro.mall.model.SmsFlashPromotionOrder">
+    <id column="id" jdbcType="BIGINT" property="id" />
+    <result column="flash_promotion_id" jdbcType="BIGINT" property="flashPromotionId" />
+    <result column="flash_promotion_session_id" jdbcType="BIGINT" property="flashPromotionSessionId" />
+    <result column="product_id" jdbcType="BIGINT" property="productId" />
+    <result column="product_sku_id" jdbcType="BIGINT" property="productSkuId" />
+    <result column="member_id" jdbcType="BIGINT" property="memberId" />
+    <result column="member_username" jdbcType="VARCHAR" property="memberUsername" />
+    <result column="order_id" jdbcType="BIGINT" property="orderId" />
+    <result column="order_sn" jdbcType="VARCHAR" property="orderSn" />
+    <result column="quantity" jdbcType="INTEGER" property="quantity" />
+    <result column="flash_promotion_price" jdbcType="DECIMAL" property="flashPromotionPrice" />
+    <result column="status" jdbcType="INTEGER" property="status" />
+    <result column="create_time" jdbcType="TIMESTAMP" property="createTime" />
+  </resultMap>
+  <sql id="Example_Where_Clause">
+    <where>
+      <foreach collection="oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Update_By_Example_Where_Clause">
+    <where>
+      <foreach collection="example.oredCriteria" item="criteria" separator="or">
+        <if test="criteria.valid">
+          <trim prefix="(" prefixOverrides="and" suffix=")">
+            <foreach collection="criteria.criteria" item="criterion">
+              <choose>
+                <when test="criterion.noValue">
+                  and ${criterion.condition}
+                </when>
+                <when test="criterion.singleValue">
+                  and ${criterion.condition} #{criterion.value}
+                </when>
+                <when test="criterion.betweenValue">
+                  and ${criterion.condition} #{criterion.value} and #{criterion.secondValue}
+                </when>
+                <when test="criterion.listValue">
+                  and ${criterion.condition}
+                  <foreach close=")" collection="criterion.value" item="listItem" open="(" separator=",">
+                    #{listItem}
+                  </foreach>
+                </when>
+              </choose>
+            </foreach>
+          </trim>
+        </if>
+      </foreach>
+    </where>
+  </sql>
+  <sql id="Base_Column_List">
+    id, flash_promotion_id, flash_promotion_session_id, product_id, product_sku_id, member_id, 
+    member_username, order_id, order_sn, quantity, flash_promotion_price, status, create_time
+  </sql>
+  <select id="selectByExample" parameterType="com.macro.mall.model.SmsFlashPromotionOrderExample" resultMap="BaseResultMap">
+    select
+    <if test="distinct">
+      distinct
+    </if>
+    <include refid="Base_Column_List" />
+    from sms_flash_promotion_order
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+    <if test="orderByClause != null">
+      order by ${orderByClause}
+    </if>
+  </select>
+  <select id="selectByPrimaryKey" parameterType="java.lang.Long" resultMap="BaseResultMap">
+    select 
+    <include refid="Base_Column_List" />
+    from sms_flash_promotion_order
+    where id = #{id,jdbcType=BIGINT}
+  </select>
+  <delete id="deleteByPrimaryKey" parameterType="java.lang.Long">
+    delete from sms_flash_promotion_order
+    where id = #{id,jdbcType=BIGINT}
+  </delete>
+  <delete id="deleteByExample" parameterType="com.macro.mall.model.SmsFlashPromotionOrderExample">
+    delete from sms_flash_promotion_order
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </delete>
+  <insert id="insert" parameterType="com.macro.mall.model.SmsFlashPromotionOrder">
+    <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Long">
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into sms_flash_promotion_order (flash_promotion_id, flash_promotion_session_id, 
+      product_id, product_sku_id, member_id, 
+      member_username, order_id, order_sn, 
+      quantity, flash_promotion_price, status, 
+      create_time)
+    values (#{flashPromotionId,jdbcType=BIGINT}, #{flashPromotionSessionId,jdbcType=BIGINT}, 
+      #{productId,jdbcType=BIGINT}, #{productSkuId,jdbcType=BIGINT}, #{memberId,jdbcType=BIGINT}, 
+      #{memberUsername,jdbcType=VARCHAR}, #{orderId,jdbcType=BIGINT}, #{orderSn,jdbcType=VARCHAR}, 
+      #{quantity,jdbcType=INTEGER}, #{flashPromotionPrice,jdbcType=DECIMAL}, #{status,jdbcType=INTEGER}, 
+      #{createTime,jdbcType=TIMESTAMP})
+  </insert>
+  <insert id="insertSelective" parameterType="com.macro.mall.model.SmsFlashPromotionOrder">
+    <selectKey keyProperty="id" order="AFTER" resultType="java.lang.Long">
+      SELECT LAST_INSERT_ID()
+    </selectKey>
+    insert into sms_flash_promotion_order
+    <trim prefix="(" suffix=")" suffixOverrides=",">
+      <if test="flashPromotionId != null">
+        flash_promotion_id,
+      </if>
+      <if test="flashPromotionSessionId != null">
+        flash_promotion_session_id,
+      </if>
+      <if test="productId != null">
+        product_id,
+      </if>
+      <if test="productSkuId != null">
+        product_sku_id,
+      </if>
+      <if test="memberId != null">
+        member_id,
+      </if>
+      <if test="memberUsername != null">
+        member_username,
+      </if>
+      <if test="orderId != null">
+        order_id,
+      </if>
+      <if test="orderSn != null">
+        order_sn,
+      </if>
+      <if test="quantity != null">
+        quantity,
+      </if>
+      <if test="flashPromotionPrice != null">
+        flash_promotion_price,
+      </if>
+      <if test="status != null">
+        status,
+      </if>
+      <if test="createTime != null">
+        create_time,
+      </if>
+    </trim>
+    <trim prefix="values (" suffix=")" suffixOverrides=",">
+      <if test="flashPromotionId != null">
+        #{flashPromotionId,jdbcType=BIGINT},
+      </if>
+      <if test="flashPromotionSessionId != null">
+        #{flashPromotionSessionId,jdbcType=BIGINT},
+      </if>
+      <if test="productId != null">
+        #{productId,jdbcType=BIGINT},
+      </if>
+      <if test="productSkuId != null">
+        #{productSkuId,jdbcType=BIGINT},
+      </if>
+      <if test="memberId != null">
+        #{memberId,jdbcType=BIGINT},
+      </if>
+      <if test="memberUsername != null">
+        #{memberUsername,jdbcType=VARCHAR},
+      </if>
+      <if test="orderId != null">
+        #{orderId,jdbcType=BIGINT},
+      </if>
+      <if test="orderSn != null">
+        #{orderSn,jdbcType=VARCHAR},
+      </if>
+      <if test="quantity != null">
+        #{quantity,jdbcType=INTEGER},
+      </if>
+      <if test="flashPromotionPrice != null">
+        #{flashPromotionPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="status != null">
+        #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null">
+        #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </trim>
+  </insert>
+  <select id="countByExample" parameterType="com.macro.mall.model.SmsFlashPromotionOrderExample" resultType="java.lang.Long">
+    select count(*) from sms_flash_promotion_order
+    <if test="_parameter != null">
+      <include refid="Example_Where_Clause" />
+    </if>
+  </select>
+  <update id="updateByExampleSelective" parameterType="map">
+    update sms_flash_promotion_order
+    <set>
+      <if test="row.id != null">
+        id = #{row.id,jdbcType=BIGINT},
+      </if>
+      <if test="row.flashPromotionId != null">
+        flash_promotion_id = #{row.flashPromotionId,jdbcType=BIGINT},
+      </if>
+      <if test="row.flashPromotionSessionId != null">
+        flash_promotion_session_id = #{row.flashPromotionSessionId,jdbcType=BIGINT},
+      </if>
+      <if test="row.productId != null">
+        product_id = #{row.productId,jdbcType=BIGINT},
+      </if>
+      <if test="row.productSkuId != null">
+        product_sku_id = #{row.productSkuId,jdbcType=BIGINT},
+      </if>
+      <if test="row.memberId != null">
+        member_id = #{row.memberId,jdbcType=BIGINT},
+      </if>
+      <if test="row.memberUsername != null">
+        member_username = #{row.memberUsername,jdbcType=VARCHAR},
+      </if>
+      <if test="row.orderId != null">
+        order_id = #{row.orderId,jdbcType=BIGINT},
+      </if>
+      <if test="row.orderSn != null">
+        order_sn = #{row.orderSn,jdbcType=VARCHAR},
+      </if>
+      <if test="row.quantity != null">
+        quantity = #{row.quantity,jdbcType=INTEGER},
+      </if>
+      <if test="row.flashPromotionPrice != null">
+        flash_promotion_price = #{row.flashPromotionPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="row.status != null">
+        status = #{row.status,jdbcType=INTEGER},
+      </if>
+      <if test="row.createTime != null">
+        create_time = #{row.createTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByExample" parameterType="map">
+    update sms_flash_promotion_order
+    set id = #{row.id,jdbcType=BIGINT},
+      flash_promotion_id = #{row.flashPromotionId,jdbcType=BIGINT},
+      flash_promotion_session_id = #{row.flashPromotionSessionId,jdbcType=BIGINT},
+      product_id = #{row.productId,jdbcType=BIGINT},
+      product_sku_id = #{row.productSkuId,jdbcType=BIGINT},
+      member_id = #{row.memberId,jdbcType=BIGINT},
+      member_username = #{row.memberUsername,jdbcType=VARCHAR},
+      order_id = #{row.orderId,jdbcType=BIGINT},
+      order_sn = #{row.orderSn,jdbcType=VARCHAR},
+      quantity = #{row.quantity,jdbcType=INTEGER},
+      flash_promotion_price = #{row.flashPromotionPrice,jdbcType=DECIMAL},
+      status = #{row.status,jdbcType=INTEGER},
+      create_time = #{row.createTime,jdbcType=TIMESTAMP}
+    <if test="example != null">
+      <include refid="Update_By_Example_Where_Clause" />
+    </if>
+  </update>
+  <update id="updateByPrimaryKeySelective" parameterType="com.macro.mall.model.SmsFlashPromotionOrder">
+    update sms_flash_promotion_order
+    <set>
+      <if test="flashPromotionId != null">
+        flash_promotion_id = #{flashPromotionId,jdbcType=BIGINT},
+      </if>
+      <if test="flashPromotionSessionId != null">
+        flash_promotion_session_id = #{flashPromotionSessionId,jdbcType=BIGINT},
+      </if>
+      <if test="productId != null">
+        product_id = #{productId,jdbcType=BIGINT},
+      </if>
+      <if test="productSkuId != null">
+        product_sku_id = #{productSkuId,jdbcType=BIGINT},
+      </if>
+      <if test="memberId != null">
+        member_id = #{memberId,jdbcType=BIGINT},
+      </if>
+      <if test="memberUsername != null">
+        member_username = #{memberUsername,jdbcType=VARCHAR},
+      </if>
+      <if test="orderId != null">
+        order_id = #{orderId,jdbcType=BIGINT},
+      </if>
+      <if test="orderSn != null">
+        order_sn = #{orderSn,jdbcType=VARCHAR},
+      </if>
+      <if test="quantity != null">
+        quantity = #{quantity,jdbcType=INTEGER},
+      </if>
+      <if test="flashPromotionPrice != null">
+        flash_promotion_price = #{flashPromotionPrice,jdbcType=DECIMAL},
+      </if>
+      <if test="status != null">
+        status = #{status,jdbcType=INTEGER},
+      </if>
+      <if test="createTime != null">
+        create_time = #{createTime,jdbcType=TIMESTAMP},
+      </if>
+    </set>
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+  <update id="updateByPrimaryKey" parameterType="com.macro.mall.model.SmsFlashPromotionOrder">
+    update sms_flash_promotion_order
+    set flash_promotion_id = #{flashPromotionId,jdbcType=BIGINT},
+      flash_promotion_session_id = #{flashPromotionSessionId,jdbcType=BIGINT},
+      product_id = #{productId,jdbcType=BIGINT},
+      product_sku_id = #{productSkuId,jdbcType=BIGINT},
+      member_id = #{memberId,jdbcType=BIGINT},
+      member_username = #{memberUsername,jdbcType=VARCHAR},
+      order_id = #{orderId,jdbcType=BIGINT},
+      order_sn = #{orderSn,jdbcType=VARCHAR},
+      quantity = #{quantity,jdbcType=INTEGER},
+      flash_promotion_price = #{flashPromotionPrice,jdbcType=DECIMAL},
+      status = #{status,jdbcType=INTEGER},
+      create_time = #{createTime,jdbcType=TIMESTAMP}
+    where id = #{id,jdbcType=BIGINT}
+  </update>
+</mapper>
