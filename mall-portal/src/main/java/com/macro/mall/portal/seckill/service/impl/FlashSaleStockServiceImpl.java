@@ -81,6 +81,12 @@ public class FlashSaleStockServiceImpl implements FlashSaleStockService {
                 memberId, quantity, perLimit);
     }
 
+    @Override
+    public Long getRemainingStock(Long promotionId, Long sessionId, Long productId) {
+        Object value = redisTemplate.opsForValue().get(stockKey(promotionId, sessionId, productId));
+        return value == null ? -1L : ((Number) value).longValue();
+    }
+
     private String stockKey(Long promotionId, Long sessionId, Long productId) {
         return redisDatabase + ":" + stockKeyPrefix + ":" + promotionId + ":" + sessionId + ":" + productId;
     }

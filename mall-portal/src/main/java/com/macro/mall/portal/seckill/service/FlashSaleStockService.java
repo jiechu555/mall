@@ -18,4 +18,11 @@ public interface FlashSaleStockService {
      * @return 1 预扣成功；0 售罄；-1 超出限购；-2 活动未预热
      */
     Long deduct(Long promotionId, Long sessionId, Long productId, Long memberId, Integer quantity, Integer perLimit);
+
+    /**
+     * 查询 Redis 实时余量（商品列表接口用）
+     *
+     * @return 剩余数量；活动未预热时返回 -1
+     */
+    Long getRemainingStock(Long promotionId, Long sessionId, Long productId);
 }

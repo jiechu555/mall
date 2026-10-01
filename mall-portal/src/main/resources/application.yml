@@ -62,7 +62,9 @@ redis:
     member: 'ums:member'
     flashSaleStock: 'sms:flashSaleStock'   # 完整key: mall:sms:flashSaleStock:{活动id}:{场次id}:{商品id}
     flashSaleBought: 'sms:flashSaleBought' # 已购Hash: field=memberId, value=件数
-    flashSaleToken: 'sms:flashSaleToken'   # 秒杀令牌Set
+    flashSaleToken: 'sms:flashSaleToken'   # 秒杀令牌Set: mall:sms:flashSaleToken:{活动id}:{场次id}
+    flashSaleRate: 'sms:flashSaleRate'     # 用户级限流: mall:sms:flashSaleRate:{memberId}
+    flashSaleTicket: 'sms:flashSaleTicket' # 受理号: mall:sms:flashSaleTicket:{ticket}，5分钟
   expire:
     authCode: 90 # 验证码超期时间
     common: 86400 # 24小时
