@@ -2,6 +2,7 @@ package com.macro.mall.portal.ai.service.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.macro.mall.mapper.PmsBrandMapper;
 import com.macro.mall.mapper.PmsProductAttributeMapper;
@@ -16,6 +17,7 @@ import com.macro.mall.model.PmsProductAttributeValueExample;
 import com.macro.mall.model.PmsProductExample;
 import com.macro.mall.model.PmsSkuStock;
 import com.macro.mall.model.PmsSkuStockExample;
+import com.macro.mall.portal.ai.client.AiEmbeddingClient;
 import com.macro.mall.portal.ai.domain.AiKbHit;
 import com.macro.mall.portal.ai.service.AiKbService;
 import org.apache.http.util.EntityUtils;
@@ -37,8 +39,8 @@ import java.util.List;
 /**
  * 知识库服务实现：统一走低层 RestClient（索引管理 / bulk / 检索一把抓，
  * 向量检索（script_score）后续 commit 也在同一客户端上扩展，不混两套 API）。
- * mapping 的 dense_vector(1024) 本 commit 即建好——维度与索引绑定，
- * 向量化管道接入后无需 reindex（写入时补字段即可）。
+ * 嵌入（commit 3）：AiEmbeddingClient 由 ai.enabled 条件装配——Bean 不存在时 rebuild 仅做 BM25 索引
+ * （向量列为空不报错，dense_vector 是 NoopField 允许缺失），接入后 rebuild 自动补向量，无需改 mapping。
  * Created by jiechu555 on 2026/10/01.
  */
 @Service
@@ -70,6 +72,9 @@ public class AiKbServiceImpl implements AiKbService {
     private PmsProductAttributeValueMapper attributeValueMapper;
     @Autowired
     private PmsSkuStockMapper skuStockMapper;
+    /** ai.enabled=false 时为 null（由 AiClientConfig 条件装配），rebuild 仅 BM25 */
+    @Autowired(required = false)
+    private AiEmbeddingClient embeddingClient;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -83,11 +88,14 @@ public class AiKbServiceImpl implements AiKbService {
 
             StringBuilder bulk = new StringBuilder();
             int count = 0;
+            int vectorCount = 0;
             for (ObjectNode doc : buildProductDocs()) {
+                vectorCount += embedIfAvailable(doc);
                 appendBulkLine(bulk, doc);
                 count++;
             }
             for (ObjectNode doc : buildFaqDocs()) {
+                vectorCount += embedIfAvailable(doc);
                 appendBulkLine(bulk, doc);
                 count++;
             }
@@ -97,7 +105,7 @@ public class AiKbServiceImpl implements AiKbService {
                 restClient.performRequest(bulkRequest);
                 restClient.performRequest(new Request("POST", "/" + INDEX + "/_refresh"));
             }
-            LOGGER.info("AI 知识库重建完成：{} 篇文档", count);
+            LOGGER.info("AI 知识库重建完成：{} 篇文档（含向量 {} 篇）", count, vectorCount);
             return count;
         } catch (Exception e) {
             throw new RuntimeException("AI 知识库重建失败", e);
@@ -149,6 +157,29 @@ public class AiKbServiceImpl implements AiKbService {
         } catch (Exception e) {
             LOGGER.error("BM25 检索失败: {}", keyword, e);
             return new ArrayList<>();
+        }
+    }
+
+    /**
+     * 嵌入可用时给文档补 content_vector 字段（title + " " + content 拼接后取嵌入）。
+     * 返回 1（写入向量）或 0（嵌入不可用或该条失败不阻塞整体重建）。
+     * 单条嵌入失败只记日志不中断——部分文档缺向量不影响 BM25 检索（混合检索只对有向量的文档生效）。
+     */
+    private int embedIfAvailable(ObjectNode doc) {
+        if (embeddingClient == null) {
+            return 0;
+        }
+        try {
+            String text = doc.path("title").asText() + " " + doc.path("content").asText();
+            float[] vector = embeddingClient.embed(text);
+            ArrayNode vectorNode = doc.putArray("content_vector");
+            for (float v : vector) {
+                vectorNode.add(v);
+            }
+            return 1;
+        } catch (Exception e) {
+            LOGGER.warn("文档嵌入失败（不影响 BM25）：{}", doc.path("title").asText(), e);
+            return 0;
         }
     }
 
