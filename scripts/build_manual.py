@@ -89,6 +89,35 @@ def term_block(lines, title=None):
 
 
 GREEN = "6A9955"
+
+
+def tip_block(title, text):
+    """知识点卡片：浅蓝底，穿插在步骤之间帮助理解"""
+    table = doc.add_table(rows=1, cols=1)
+    table.autofit = True
+    tr = table.rows[0]._tr
+    trPr = tr.get_or_add_trPr()
+    cantSplit = OxmlElement("w:cantSplit")
+    trPr.append(cantSplit)
+    cell = table.rows[0].cells[0]
+    set_cell_bg(cell, "EEF4FB")
+    p = cell.paragraphs[0]
+    p.paragraph_format.space_after = Pt(2)
+    r = p.add_run("💡 知识点 · " + title)
+    r.bold = True
+    r.font.size = Pt(9.5)
+    r.font.color.rgb = RGBColor.from_string("0B57D0")
+    r.font.name = "Microsoft YaHei"
+    r._element.rPr.rFonts.set(qn("w:eastAsia"), "Microsoft YaHei")
+    p2 = cell.add_paragraph()
+    p2.paragraph_format.space_after = Pt(0)
+    r2 = p2.add_run(text)
+    r2.font.size = Pt(9.5)
+    r2.font.color.rgb = RGBColor.from_string("2C3E50")
+    r2.font.name = "Microsoft YaHei"
+    r2._element.rPr.rFonts.set(qn("w:eastAsia"), "Microsoft YaHei")
+    doc.add_paragraph().paragraph_format.space_after = Pt(2)
+    return table
 YELLOW = "DCDCAA"
 BLUE = "569CD6"
 GRAY = "9AA4B2"
@@ -116,6 +145,38 @@ body("")
 body("适用环境：Windows + JDK 17 + Maven 3.9.9（D:\\dev-tools）+ Docker Desktop。全部命令与输出为 2026-10-03 实机复现记录，逐条可复制。")
 body("跟随本手册走完 = 你独立跑通了秒杀子系统（简历项目一）。出错先查文末《常见故障速查表》。", color="0B57D0")
 
+# ============ 学习地图 ============
+heading("学习地图 · 这本手册教你什么", size=13, space_before=10)
+body("mall 是三个项目里工程链最全的一个——企业级 Java 栈的核心概念在这里各就各位：", size=9.5)
+tbl = doc.add_table(rows=8, cols=2)
+tbl.style = "Table Grid"
+rows = [
+    ("概念", "在哪学（步骤）"),
+    ("Docker 容器与端口映射", "步骤 1"),
+    ("SQL 幂等写法与密码哈希", "步骤 2"),
+    ("Maven 多模块构建与 fat jar", "步骤 3"),
+    ("JWT 无状态鉴权 + 配置隔离（profile）", "步骤 4"),
+    ("会员端 / 管理端双体系", "步骤 5"),
+    ("缓存（Redis）+ 脚本原子性（Lua）+ 消息队列（MQ）", "步骤 6 + 原理图解"),
+    ("压测思维：并发 / QPS / 分位数延迟", "历史实测数据"),
+]
+for i, (a, b) in enumerate(rows):
+    c0, c1 = tbl.rows[i].cells
+    c0.text, c1.text = a, b
+    for c in (c0, c1):
+        for pp in c.paragraphs:
+            pp.paragraph_format.keep_with_next = (i == 0)
+            for rr in pp.runs:
+                rr.font.size = Pt(8.5)
+                rr.font.name = "Microsoft YaHei"
+                rr._element.rPr.rFonts.set(qn("w:eastAsia"), "Microsoft YaHei")
+    if i == 0:
+        set_cell_bg(c0, "1A2636"); set_cell_bg(c1, "1A2636")
+        for pp in c0.paragraphs + c1.paragraphs:
+            for rr in pp.runs:
+                rr.font.color.rgb = RGBColor.from_string("FFFFFF")
+doc.add_paragraph().paragraph_format.space_after = Pt(2)
+
 # ============ 步骤 1 ============
 heading("步骤 1 · 启动 Docker Desktop 与五套中间件")
 body("开始菜单启动 Docker Desktop（托盘图标变绿约 1 分钟）。五套中间件容器配置了自启，Docker 起来后直接验证：")
@@ -136,6 +197,9 @@ term_block([
     ("$ curl -s localhost:9200 | grep tagline", YELLOW),
     ('  "tagline" : "You Know, for Search"', "D4D4D4"),
 ], "终端")
+
+tip_block("Docker 容器与端口映射（步骤 1 在干什么）",
+    "镜像是『安装包』（只读模板），容器是『跑起来的实例』。MySQL 装在容器里 = 数据库不污染宿主机、版本精确可控（mysql:5.7 到哪都一样）。端口映射 -p 3306:3306 是把容器内的门牌接到宿主机——你连 localhost:3306 实际进的是容器。数据放卷（volume）持久化在宿主盘，容器删了数据还在。想一想：为什么五套中间件各一个容器，而不是全装一台虚拟机？→ 隔离+按需重启+启动秒级，出了问题爆炸半径小。")
 
 # ============ 步骤 2 ============
 heading("步骤 2 · 数据库与演示数据检查")
@@ -159,6 +223,9 @@ term_block([
 ], "终端")
 body("这段 SQL 是「演示脚手架」：真实业务里令牌由运营侧批量签发、库存由场次开始前的预热任务写入，二开版保留了服务层接口（issueTokens / warmUp），演示阶段用 redis-cli 等价注入——见步骤 6。")
 
+tip_block("可重跑 SQL 与 bcrypt（步骤 2 的两个细节）",
+    "演示 SQL 设计成重复执行结果一致：DELETE 再 INSERT、INSERT ... ON DUPLICATE KEY UPDATE——这叫幂等，运维脚本的铁律。会员密码存的是 bcrypt 哈希：单向（不可逆推原文）、带盐（同密码每次哈希结果都不同）——所以『找回密码』只能重置不能告诉你原密码。本手册直接复用 admin 的哈希，等于给 test 账号设了同款密码。想一想：为什么不用 MD5？→ 无盐且太快，彩虹表+暴力破解秒破。")
+
 # ============ 步骤 3 ============
 heading("步骤 3 · 打包两个应用（约 33 秒）")
 body("注意 -Ddocker.skip=true：pom 里的 docker-maven-plugin 默认指向原作者办公室的远程 Docker（192.168.3.101:2375），不跳过必报错（故障表 F1）。")
@@ -170,6 +237,9 @@ term_block([
     ("2026-10-03 16:57:15 .../mall-admin-1.0-SNAPSHOT.jar      # 92 MB", "D4D4D4"),
     ("2026-10-03 16:57:24 .../mall-portal-1.0-SNAPSHOT.jar     # 139 MB", "D4D4D4"),
 ], "终端")
+
+tip_block("Maven 多模块与 fat jar（步骤 3 的构建体系）",
+    "mall 是多模块工程：mall-common（工具）、mall-mbg（数据库映射）、mall-security（鉴权）、mall-admin/portal（应用）。-pl 选要打包的应用，-am 自动先构建它依赖的模块。fat jar（139MB）= 应用代码 + BOOT-INF 里嵌套的全部依赖 + 内嵌 Tomcat → java -jar 一条命令启动，不用部署应用服务器。-DskipTests 跳过测试加速（正式交付绝不许跳）。想一想：为什么依赖模块改了行代码，admin 也要重新打包？→ jar 里嵌的是依赖的副本，不是引用。")
 
 # ============ 步骤 4 ============
 heading("步骤 4 · 启动 mall-admin，登录拿 JWT（约 20 秒）")
@@ -191,6 +261,9 @@ body("商品 26 号「华为 HUAWEI P20」正是步骤 6 秒杀的演示商品�
 pic = doc.add_picture(r"C:\Users\12808\Documents\code\mall\document\manual-assets\swagger-ui.png", width=Inches(5.8))
 doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+tip_block("JWT 三段式与 profile 隔离（步骤 4 的鉴权原理）",
+    "JWT = 头.载荷.签名 三段 Base64。载荷存用户名+过期时间（可解码看，别放敏感信息）；签名用服务端密钥对前两段计算——改一个字符签名就对不上，服务端验签即可信，不用存 session（无状态，水平扩容随便加机器）。tokenHead『Bearer 』是约定前缀。profile（dev/local/prod）让同一份代码不同环境读不同配置——local 装密钥不入 git。想一想：JWT 怎么『注销』？→ 难题：本身无法撤销，只能短过期+黑名单，如实答反而加分。")
+
 # ============ 步骤 5 ============
 heading("步骤 5 · 启动 mall-portal，会员登录（约 21 秒）")
 body("portal 加 local profile 是为了读本地私密配置（智谱 AI key，不入库）：")
@@ -202,6 +275,9 @@ term_block([
     ("$ curl -s -X POST 'http://localhost:8085/sso/login?username=test&password=macro123'", YELLOW),
     ('{"code":200,...,"data":{"token":"eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."}}   # 155 字符', "D4D4D4"),
 ], "终端")
+
+tip_block("双端双密钥（步骤 5 的体系设计）",
+    "mall-admin（后台管理，给运营）和 mall-portal（商城前台，给买家）是两个独立应用：独立端口、独立数据库表域（ums_admin vs ums_member）、独立 JWT 密钥（mall-admin-secret vs mall-portal-secret）。为什么分开？管理员 token 拿不到 portal 接口、买家 token 进不了后台——爆炸半径隔离 + 部署伸缩独立。这是微服务拆分的最小雏形。想一想：两边能用同一个用户表吗？→ 能但耦合，权限模型完全不同迟早分家。")
 
 # ============ 步骤 6 ============
 heading("步骤 6 · 秒杀全流程（三层防刷完整可见）")
@@ -244,6 +320,9 @@ term_block([
     ("8    1    202610030100000002    599.00", "D4D4D4"),
 ], "终端")
 
+tip_block("Redis + Lua + MQ 三件套分工（步骤 6 的世界模型）",
+    "Redis：内存库，单线程处理命令 → 十万级 QPS，扛得住瞬时洪峰；但单条命令不够用（扣库存是查-判-改三步），Lua 脚本把三步打包成一个原子单元——期间不接受任何其他命令。MQ：消息队列，发出去就返回（异步），消费端按自己的节奏慢慢落库——洪峰在 MQ 里排队，像水库蓄洪。三者分工：Redis 管快、Lua 管对、MQ 管稳。想一想：为什么不用 MySQL 行锁 SELECT FOR UPDATE？→ 能，但每请求一个事务连接，500 并发数据库连接池就爆了。")
+
 # ============ 步骤 7 ============
 heading("步骤 7 · 停止应用（还原环境）")
 term_block([
@@ -252,6 +331,9 @@ term_block([
     ("端口已释放", "D4D4D4"),
 ], "终端")
 body("Docker 中间件不必停——下次复现直接从步骤 3 开始。彻底不用时退出 Docker Desktop 即可。")
+
+tip_block("优雅停机（步骤 7 为什么这么停）",
+    "直接关窗口=进程被强杀：正在处理的请求断在半路（下单扣了 Redis 没发 MQ 就死，靠对账救回）。Stop-Process 虽是强杀，但本地开发可接受；生产用 kill -15（SIGTERM）给进程善后时间：停止接新请求→处理完存量→释放连接→退出。联想：TinyWebServer 手册里 SIGTERM 优雅退出是同一原理的 C++ 版。想一想：为什么 mall 的对账任务能容忍强杀？→ 因为设计了补偿链路——兜底思维贯穿始终。")
 
 # ============ 原理图解 ============
 heading("原理图解 · 秒杀为什么这么设计（双链路）", size=14)
