@@ -35,9 +35,11 @@ def heading(text, size=15, color="1A2636", space_before=14):
     return p
 
 
-def body(text, size=10.5, color="2C3E50"):
+def body(text, size=10.5, color="2C3E50", keep=False):
     p = doc.add_paragraph()
     p.paragraph_format.space_after = Pt(4)
+    if keep:
+        p.paragraph_format.keep_with_next = True
     r = p.add_run(text)
     r.font.size = Pt(size)
     r.font.color.rgb = RGBColor.from_string(color)
@@ -497,6 +499,53 @@ for i, (a, b) in enumerate(rows):
             for rr in pp.runs:
                 rr.font.color.rgb = RGBColor.from_string("FFFFFF")
 doc.add_paragraph().paragraph_format.space_after = Pt(2)
+
+# ============ 动手练习 ============
+heading("动手练习 · 读十遍不如做一遍（每个都有验证标准）", size=13, space_before=10)
+for t, d, v in [
+    ("练习 1 · 看库存售罄路径（10 分钟）",
+     "服务都启动的状态下：docker exec redis redis-cli SET mall:sms:flashSaleStock:14:8:26 1（库存只留 1 件），注入新令牌后用另一个思路——先 DEL 已购 Hash（mall:sms:flashSaleBought:14:8:26）和受理单，再用新令牌下单两次。",
+     "验证：第一单受理成功（余量 1→0）；第二单被拒且 message 是「售罄」语义（Lua 返回 0 的路径）——和限购拒绝（-1）的文案不同。做完把库存 SET 回 100。"),
+    ("练习 2 · 总开关回滚演习（15 分钟）",
+     "把 mall-portal 的 application.yml 里 seckill.enabled 改为 false，重启 portal，curl /seckill/list。",
+     "验证：秒杀接口整体消失/不再装配——这就是「压测/灰度/回滚都用它」的含义：新模块上线出问题，一个开关退回，不用回滚代码。看完改回 true 重启。"),
+    ("练习 3 · 对账任务的存在感（5 分钟）",
+     "重启 portal 时注意启动日志里 seckill 相关的 Bean 装配行；再在数据库里 SELECT 一次 sms_flash_promotion_order 全表。",
+     "验证：你跑过的每一单都在表里且 status 可解释——对账任务比对的就是这张表和 Redis 的差值。理解「守恒」：库存扣的件数 = 受理单件数 + 回补记录。"),
+]:
+    body(t, color="1A2636", size=10, keep=True)
+    body("做法：" + d, size=9.5)
+    body(v, size=9.5, color="5F6B7A")
+
+# ============ 简历对照 ============
+heading("简历对照 · 简历上的每句话在本手册哪里", size=13, space_before=10)
+tbl = doc.add_table(rows=6, cols=2)
+tbl.style = "Table Grid"
+rows = [
+    ("简历句子（项目一）", "证据位置"),
+    ("「Redis Lua 将限购+扣减+已购合并为单次原子操作」", "代码精读 seckill_deduct.lua 逐行"),
+    ("「三层防刷：频控→令牌 SREM 原子核销→限购」", "原理图解同步链 ①②③"),
+    ("「JUnit 1000 并发抢 100 件：成功恰 100、超卖 0」", "历史实测数据表第 1 行"),
+    ("「P99 55ms / 峰值 1441 QPS（同机受限值）」", "历史实测数据表 + 面试五问 Q4 的答法"),
+    ("「RabbitMQ 停 30s 故障演练不雪崩」", "历史实测数据表第 4 行 + 练习 2 的开关思维"),
+]
+for i, (a, b) in enumerate(rows):
+    c0, c1 = tbl.rows[i].cells
+    c0.text, c1.text = a, b
+    for c in (c0, c1):
+        for pp in c.paragraphs:
+            pp.paragraph_format.keep_with_next = (i == 0)
+            for rr in pp.runs:
+                rr.font.size = Pt(9)
+                rr.font.name = "Microsoft YaHei"
+                rr._element.rPr.rFonts.set(qn("w:eastAsia"), "Microsoft YaHei")
+    if i == 0:
+        set_cell_bg(c0, "1A2636"); set_cell_bg(c1, "1A2636")
+        for pp in c0.paragraphs + c1.paragraphs:
+            for rr in pp.runs:
+                rr.font.color.rgb = RGBColor.from_string("FFFFFF")
+doc.add_paragraph().paragraph_format.space_after = Pt(2)
+body("用法：面试前一晚只看右列。每句话都要能说出「我亲手跑过其中哪部分」（本手册步骤 6 + 三个练习）。", size=9, color="0B57D0")
 
 # ============ 自测题 ============
 heading("复现自测题（答出来说明你真懂了）", size=12, space_before=8)
