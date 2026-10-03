@@ -177,6 +177,23 @@ for i, (a, b) in enumerate(rows):
                 rr.font.color.rgb = RGBColor.from_string("FFFFFF")
 doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
+# ============ 目录速览 ============
+heading("项目目录速览 · 每个模块是干什么的", size=13, space_before=10)
+term_block([
+    ("mall/  （Maven 多模块工程）", BLUE),
+    ("├─ mall-admin/    ← 后台管理应用（端口 8080）：商品/订单/用户管理 + 登录", "D4D4D4"),
+    ("├─ mall-portal/   ← 商城前台应用（端口 8085）：会员下单 + 秒杀子系统★", "D4D4D4"),
+    ("│   └─ seckill/", GRAY),
+    ("│       ├─ controller/FlashSaleController   ← 三个接口：list/order/result", "D4D4D4"),
+    ("│       ├─ service/FlashSaleServiceImpl     ← 限流→核销→Lua→MQ 的编排", "D4D4D4"),
+    ("│       ├─ component/FlashSaleOrderReceiver ← MQ 消费端（幂等落库）", "D4D4D4"),
+    ("│       └─ resources/luascript/seckill_deduct.lua ← 原子预扣脚本（精读主角）", "D4D4D4"),
+    ("├─ mall-common/   ← 工具与通用响应；mall-mbg/ ← MyBatis 数据库映射生成", "D4D4D4"),
+    ("├─ mall-security/ ← JWT 鉴权组件（admin/portal 共用框架、各配各的密钥）", "D4D4D4"),
+    ("├─ config/application-local.yml ← 本地私密配置（AI key，不入库）", "D4D4D4"),
+    ("└─ document/     ← sql/（建库脚本）docker/（中间件编排）seckill-benchmark/（压测）", "D4D4D4"),
+], title="目录树")
+
 # ============ 步骤 1 ============
 heading("步骤 1 · 启动 Docker Desktop 与五套中间件")
 body("开始菜单启动 Docker Desktop（托盘图标变绿约 1 分钟）。五套中间件容器配置了自启，Docker 起来后直接验证：")
@@ -355,6 +372,23 @@ body("① 为什么同步链不落库？数据库连接和事务是稀缺资源�
 body("② 为什么用 Lua？扣库存要「查-判-改」三步，三条命令间可能插入别人的命令（竞态）。Lua 脚本在 Redis 里原子执行，三步变一步——这就是步骤 6 里 100 件永远不少卖的保证。", size=9.5)
 body("③ 消息重复投递怎么办？消费端唯一键四列 = 天然幂等键：重复消息 insert 撞唯一键直接丢弃，配合两段事务，至多一次生效。", size=9.5)
 
+# ============ 代码精读 ============
+heading("代码精读 · seckill_deduct.lua（18 行扛住 1000 并发的脚本）", size=14)
+term_block([
+    ("-- KEYS[1] 库存key   KEYS[2] 已购Hash key", GRAY),
+    ("-- ARGV[1] memberId  ARGV[2] quantity  ARGV[3] perLimit", GRAY),
+    ("-- 返回：1 预扣成功；0 售罄；-1 超出限购；-2 活动未预热", GRAY),
+    ("local bought = tonumber(redis.call('HGET', KEYS[2], ARGV[1]) or 0)", "D4D4D4"),
+    ("if bought + tonumber(ARGV[2]) > tonumber(ARGV[3]) then return -1 end", RED),
+    ("local stock = tonumber(redis.call('GET', KEYS[1]) or -1)", "D4D4D4"),
+    ("if stock < 0 then return -2 end", RED),
+    ("if stock < tonumber(ARGV[2]) then return 0 end", RED),
+    ("redis.call('DECRBY', KEYS[1], ARGV[2])", GREEN),
+    ("redis.call('HINCRBY', KEYS[2], ARGV[1], ARGV[2])", GREEN),
+    ("return 1", GREEN),
+], title="mall-portal/.../luascript/seckill_deduct.lua")
+body("逐行读：先查已购（Hash 里 memberId 已买几件）——超限购立刻返回 -1，库存都没碰；再取库存——没预热返回 -2（提示运营漏了 warmUp，而不是静默失败）；库存不够返回 0（售罄）；三道闸全过才执行写操作：DECRBY 扣库存 + HINCRBY 记已购，两步在同一个脚本里 = 原子。注意设计细节：①检查顺序是「先限购后库存」——限购是业务规则优先级更高且不消耗资源；②返回码用数字不用字符串——Lua 返回给 Java 走 long，省一次类型转换；③tonumber 包住所有入参——Java 序列化器可能把数字写成字符串，统一归一。这就是步骤 6 里「100 件永远不少卖、每人永远买不了第二件」的全部秘密。", size=9.5)
+
 # ============ 历史实测 ============
 heading("历史实测数据（简历上每个数字的出处）", size=14)
 tbl = doc.add_table(rows=6, cols=2)
@@ -429,6 +463,40 @@ for i, (a, b) in enumerate(rows):
             pp.paragraph_format.keep_with_next = True
             for rr in pp.runs:
                 rr.font.color.rgb = RGBColor.from_string("FFFFFF")
+
+# ============ 术语表 ============
+heading("术语表 · 面试口语必备", size=13, space_before=10)
+tbl = doc.add_table(rows=11, cols=2)
+tbl.style = "Table Grid"
+rows = [
+    ("术语", "一句话解释"),
+    ("QPS / TPS", "Queries Per Second 每秒请求数 / 每秒事务数（一个事务可能含多个请求）"),
+    ("P50 / P99 延迟", "50%/99% 的请求快于此耗时；P99 看长尾——平均数会骗人，长尾不会"),
+    ("超卖 Oversell", "并发下库存扣成负数：查-判-改三步间被插入其他请求的经典竞态"),
+    ("幂等 Idempotent", "同一操作执行多次效果等同一次（MQ 重复投递场景的救命特性）"),
+    ("削峰填谷", "瞬时洪峰先进队列缓存，消费端按稳定速率处理——流量的水库"),
+    ("死信队列 DLQ", "Dead Letter Queue：过期/消费失败的消息去向（延迟关单的实现基础）"),
+    ("Fat Jar", "含全部依赖与内嵌容器的可执行 jar，java -jar 直接跑"),
+    ("JWT", "JSON Web Token：签名自证的用户凭证，服务端无状态、天然支持横向扩容"),
+    ("BCrypt", "带盐慢哈希算法：单向不可逆、算力成本高，存密码的标准选择"),
+    ("Base 镜像 / 容器", "镜像=只读模板，容器=运行实例；容器删了数据要靠卷 volume 存活"),
+]
+for i, (a, b) in enumerate(rows):
+    c0, c1 = tbl.rows[i].cells
+    c0.text, c1.text = a, b
+    for c in (c0, c1):
+        for pp in c.paragraphs:
+            pp.paragraph_format.keep_with_next = (i == 0)
+            for rr in pp.runs:
+                rr.font.size = Pt(9)
+                rr.font.name = "Microsoft YaHei"
+                rr._element.rPr.rFonts.set(qn("w:eastAsia"), "Microsoft YaHei")
+    if i == 0:
+        set_cell_bg(c0, "1A2636"); set_cell_bg(c1, "1A2636")
+        for pp in c0.paragraphs + c1.paragraphs:
+            for rr in pp.runs:
+                rr.font.color.rgb = RGBColor.from_string("FFFFFF")
+doc.add_paragraph().paragraph_format.space_after = Pt(2)
 
 # ============ 自测题 ============
 heading("复现自测题（答出来说明你真懂了）", size=12, space_before=8)
