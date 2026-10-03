@@ -253,6 +253,67 @@ term_block([
 ], "终端")
 body("Docker 中间件不必停——下次复现直接从步骤 3 开始。彻底不用时退出 Docker Desktop 即可。")
 
+# ============ 原理图解 ============
+heading("原理图解 · 秒杀为什么这么设计（双链路）", size=14)
+term_block([
+    ("【同步受理链】POST /seckill/order —— 每请求 O(1)，只碰内存态存储，不落库", BLUE),
+    ("  ① 限流：memberId 计数器（Redis INCR + 过期）", "D4D4D4"),
+    ("  ② 令牌核销：SREM 原子——删掉才算数，重放直接拒", "D4D4D4"),
+    ("  ③ Lua 原子预扣：[限购判断 + 库存 DECRBY + 已购 HINCRBY] 一个脚本", "D4D4D4"),
+    ("     Redis 单线程执行 Lua 期间不被打断 = 天然临界区，无锁胜有锁", GRAY),
+    ("  ④ 发 RabbitMQ 消息（TTL+死信→延迟取消）→ 立刻返回受理号 ticket", "D4D4D4"),
+    ("", "D4D4D4"),
+    ("【异步落库链】MQ 消费端 —— 慢操作全部挪出主链路", BLUE),
+    ("  幂等受理单 insert（唯一键：活动+场次+商品+会员 四列）", "D4D4D4"),
+    ("  → 原子 SQL 锁库存 → order_type=1 正式订单 → 延迟任务到期核销", "D4D4D4"),
+    ("  → 对账任务兜底：守恒校验 / 差异回补 / 卡死受理单清扫", "D4D4D4"),
+], title="链路图")
+body("三个「为什么」（面试必问）：", size=10)
+body("① 为什么同步链不落库？数据库连接和事务是稀缺资源，秒杀瞬时流量打 MySQL 必雪崩。Redis 单线程内存操作扛得住，MySQL 只承受消费端的匀速写入——削峰填谷。", size=9.5)
+body("② 为什么用 Lua？扣库存要「查-判-改」三步，三条命令间可能插入别人的命令（竞态）。Lua 脚本在 Redis 里原子执行，三步变一步——这就是步骤 6 里 100 件永远不少卖的保证。", size=9.5)
+body("③ 消息重复投递怎么办？消费端唯一键四列 = 天然幂等键：重复消息 insert 撞唯一键直接丢弃，配合两段事务，至多一次生效。", size=9.5)
+
+# ============ 历史实测 ============
+heading("历史实测数据（简历上每个数字的出处）", size=14)
+tbl = doc.add_table(rows=6, cols=2)
+tbl.style = "Table Grid"
+rows = [
+    ("实测项（全部仓库/报告可查）", "结果"),
+    ("JUnit 1000 并发抢 100 件库存", "成功恰好 100、超卖 0（seckill 测试类）"),
+    ("JMeter 5000 请求 / 500 并发", "下单接口 P99 = 55ms；售罄 4900 全被拦"),
+    ("阶梯压测峰值", "1441 QPS——同机部署受限值（负载机/被测/中间件共 CPU），先证明拐点存在"),
+    ("RabbitMQ 停 30s 故障演练", "同步链降级不雪崩，恢复后自动续消费"),
+    ("源码级排障两例", "MySQL 容器崩溃（bind mount 遮盖 /etc/mysql）；「401」实为 NPE 经错误页伪装"),
+]
+for i, (a, b) in enumerate(rows):
+    c0, c1 = tbl.rows[i].cells
+    c0.text, c1.text = a, b
+    for c in (c0, c1):
+        for pp in c.paragraphs:
+            for rr in pp.runs:
+                rr.font.size = Pt(9)
+                rr.font.name = "Microsoft YaHei"
+                rr._element.rPr.rFonts.set(qn("w:eastAsia"), "Microsoft YaHei")
+    if i == 0:
+        set_cell_bg(c0, "1A2636"); set_cell_bg(c1, "1A2636")
+        for pp in c0.paragraphs + c1.paragraphs:
+            pp.paragraph_format.keep_with_next = True
+            for rr in pp.runs:
+                rr.font.color.rgb = RGBColor.from_string("FFFFFF")
+doc.add_paragraph().paragraph_format.space_after = Pt(2)
+
+# ============ 面试五问 ============
+heading("面试五问（面试官视角，答题要点）", size=14)
+for q, a in [
+    ("Q1 哪部分是你写的？", "mall 基座是开源的（如实说，面试官认识它）；我的增量 = 秒杀子系统 + 全部测试压测 + 两例排障，fork 上 18 个 commit 逐个可查。"),
+    ("Q2 超卖怎么防的？", "三层：Lua 原子预扣挡并发窗口；DB 唯一键四列是硬约束兜底；对账任务守恒校验自动回补——每层防的是不同失效模式。"),
+    ("Q3 消息丢了/重复了怎么办？", "重复→唯一键幂等；丢失→对账任务比对 Redis 已扣与 DB 落单差异自动补；卡死→清扫任务关单回库存。"),
+    ("Q4 1441 QPS 不高啊？", "同机受限值，负载机/被测/五套中间件共享 CPU——先承认，再讲拐点分析方法，最后说独立负载机复测是下一步。"),
+    ("Q5 为什么 Redis Lua 无回滚也要用？", "脚本内先做类型/参数校验再写，失败路径不产生半写状态；真出现不一致靠对账兜底——把「无回滚」当设计输入而非缺陷。"),
+]:
+    body(q, color="1A2636", size=10)
+    body("要点：" + a, size=9.5, color="5F6B7A")
+
 # ============ 故障表 ============
 heading("常见故障速查表")
 tbl = doc.add_table(rows=8, cols=2)
@@ -268,6 +329,10 @@ rows = [
     ("F7", "浏览器开 /doc.html 只看到一坨 401 JSON → knife4j 路径不在安全白名单（ignored.urls 只有 /swagger-ui/ 与 /v3/api-docs/*）→ 用 http://localhost:8080/swagger-ui/index.html"),
 ]
 for i, (a, b) in enumerate(rows):
+    tr1 = tbl.rows[i]._tr
+    trPr1 = tr1.get_or_add_trPr()
+    cs1 = OxmlElement("w:cantSplit")
+    trPr1.append(cs1)
     c0, c1 = tbl.rows[i].cells
     c0.text, c1.text = a, b
     for c in (c0, c1):
@@ -279,6 +344,7 @@ for i, (a, b) in enumerate(rows):
     if i == 0:
         set_cell_bg(c0, "1A2636"); set_cell_bg(c1, "1A2636")
         for pp in c0.paragraphs + c1.paragraphs:
+            pp.paragraph_format.keep_with_next = True
             for rr in pp.runs:
                 rr.font.color.rgb = RGBColor.from_string("FFFFFF")
 
